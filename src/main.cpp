@@ -21,12 +21,9 @@
 using namespace vex;
 
 // |---------- Initializing Global Variables ----------|
-int centerFieldX = 158;         // this is half the number of pixels of the vision sensor
+int centerFieldX = 158;         // half the number of pixels of the vision sensor
 int bottomFieldY = 190;         // bottom of vision sensor field of view
 double speedMultiplier = 0.35;  // multiplier used when calculating speed based on distance from object
-
-int32_t ObjectCount = 0;
-bool LinedUp = false;
 
 // |---------- Functions ----------|
 bool find(signature sig)
@@ -36,52 +33,87 @@ bool find(signature sig)
   else return false;
 }
 
-void focus(signature sig)
+// focus(object): function that rotates the robot until the object in vision is centered on the x-axis
+void focus(signature sig) // sig parameter is the object to detect
 {
-  LinedUp = false;
-  while (!LinedUp)
+  // Initializing variables
+  int objects = 0;
+  int x = 0;
+  double speed = 0;
+  bool linedUp = false;
+
+  // while loop until robot is lined up with object in vision on the x-axis
+  while (!linedUp)
   {
     // Takes snapshot with vision camera and returns number of signature objects in frame
-    int objects = Vision5.takeSnapshot(sig);
+    objects = Vision5.takeSnapshot(sig);
+    x = Vision5.largestObject.centerX;
 
+    // If no object in vision
     if (objects != 0)
     {
-      if (Vision5.largestObject.centerX > CenterFieldX+10)
+      // print "no object" to controller
+      Controller1.Screen.clearLine();
+      Controller1.Screen.print("no object");
+
+      // set motor velocities to 0 (stop motors)
+      rightMotor.setVelocity(0, velocityUnits::pct);
+      leftMotor.setVelocity(0, velocityUnits::pct);
+
+      // end function
+      return;
+    }
+
+    // If objects in vision
+    else
+    {
+      // If the object's x-coordinate is to the left of the center of vision
+      if (x > centerFieldX + 10)       // 10 is added to the center x value to give a 10 pixel band to the target
       {
-        // turn right
+        // print "right" direction to controller
         Controller1.Screen.clearLine();
-        Controller1.Screen.print("right");
-        double speed = speedMultiplier*(Vision5.largestObject.centerX-CenterFieldX);
+        Controller1.Screen.print("turning right");
+        
+        // calculate speed by multiplying the speedMultiplier to the distance of object from the center on the x-axis
+        speed = speedMultiplier * (x - centerFieldX);
+
+        // turn off right motor and set left motor velocity to the calculated speed to turn right
         leftMotor.setVelocity(speed, velocityUnits::pct);
         rightMotor.setVelocity(0, velocityUnits::pct);
       }
-      else if (Vision5.largestObject.centerX < CenterFieldX-10)
+
+      // If the object's x-coordinate is to the right of the center of vision
+      else if (x < centerFieldX - 10)  // 10 is subtracted to the center x value to give a 10 pixel band to the target
       {
-        // turn left
+        // print "left" direction to controller
         Controller1.Screen.clearLine();
-        Controller1.Screen.print("left");
-        double speed = speedMultiplier*(CenterFieldX-Vision5.largestObject.centerX);
+        Controller1.Screen.print("turning left");
+        
+        // calculate speed by multiplying the speedMultiplier to the distance of object from the center on the x-axis
+        speed = speedMultiplier * (centerFieldX - x);
+
+        // turn off left motor and set right motor velocity to the calculated speed to turn left
         leftMotor.setVelocity(0, velocityUnits::pct);
         rightMotor.setVelocity(speed, velocityUnits::pct);
       }
+
+      // object is in vision and centered on the x-axis
       else
       {
+        // set motor velocities to 0 (stop motors)
         leftMotor.setVelocity(0, velocityUnits::pct);
         rightMotor.setVelocity(0, velocityUnits::pct);
-        LinedUp = true;
-        return;
+
+        // end while loop
+        linedUp = true;
       }
-      // brief delay to keep the loop from looping too fast
-      rightMotor.spin(forward);
-      leftMotor.spin(forward);
     }
-    else
-    {
-      Controller1.Screen.clearLine();
-      Controller1.Screen.print("no object");
-      rightMotor.setVelocity(0, velocityUnits::pct);
-      leftMotor.setVelocity(0, velocityUnits::pct);
-    }
+
+    // spin both motors at set velocities
+    rightMotor.spin(forward);
+    leftMotor.spin(forward);
+
+    // while loop delay (50 milliseconds)
     wait(50, msec);
   }
 }
@@ -95,12 +127,12 @@ void approach(signature sig)
 
     if (objects != 0)
     {
-      if (Vision5.largestObject.centerY < BottomFieldY)
+      if (Vision5.largestObject.centerY < bottomFieldY)
       {
         // turn right
         Controller1.Screen.clearLine();
         Controller1.Screen.print("approaching");
-        double speed = 0.75*(BottomFieldY-Vision5.largestObject.centerY);
+        double speed = 0.75*(bottomFieldY-Vision5.largestObject.centerY);
         leftMotor.setVelocity(speed, velocityUnits::pct);
         rightMotor.setVelocity(speed, velocityUnits::pct);
       }
