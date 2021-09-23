@@ -16,23 +16,24 @@
 // Vision5              vision        5               
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
-// |---------- Library Imports ----------|
+// |-------------------- Library Imports --------------------|
 
 #include "vex.h"
 using namespace vex;
 
-// |---------- Initializing Global Variables ----------|
+// |-------------------- Initialize Global Variables --------------------|
 
-int centerFieldX = 158;         // half the number of pixels of the vision sensor
-int bottomFieldY = 190;         // bottom of vision sensor field of view
-double speedMultiplier = 0.35;  // multiplier used when calculating speed based on distance from object
+int centerFieldX = 158;          // half the number of pixels of the vision sensor
+int bottomFieldY = 190;          // bottom of vision sensor field of view
+double speedMultiplierX = 0.35;  // multiplier used when calculating speed based on distance from object on x-axis
+double speedMultiplierY = 0.75;  // multiplier used when calculating speed based on distance from object on y-axis
 
-// |---------- Functions ----------|
+// |-------------------- Function Definitions --------------------|
 
 // find(object): function that returns a boolean of whether the object is in vision
 bool find(signature sig) // sig parameter is the object to detect
 {
-  // Takes snapshot with vision camera and returns number of signature objects in frame
+  // take snapshot with vision camera and return number of signature objects in frame
   int objects = Vision5.takeSnapshot(sig);
   if (objects == 0) return false;  // return false if no objects found
   else return true;                // return true if objects in vision
@@ -41,7 +42,7 @@ bool find(signature sig) // sig parameter is the object to detect
 // focus(object): function that rotates the robot until the object in vision is centered on the x-axis
 void focus(signature sig) // sig parameter is the object to detect
 {
-  // Initializing variables
+  // initialize variables
   int objects = 0;
   int x = 0;
   double speed = 0;
@@ -56,7 +57,7 @@ void focus(signature sig) // sig parameter is the object to detect
     x = Vision5.largestObject.centerX;
 
     // if no object in vision
-    if (objects != 0)
+    if (objects == 0)
     {
       // print "no object" to controller
       Controller1.Screen.clearLine();
@@ -69,7 +70,6 @@ void focus(signature sig) // sig parameter is the object to detect
       // end function
       return;
     }
-
     // if objects in vision
     else
     {
@@ -81,13 +81,12 @@ void focus(signature sig) // sig parameter is the object to detect
         Controller1.Screen.print("turning right");
         
         // calculate speed by multiplying the speedMultiplier to the distance of object from the center on the x-axis
-        speed = speedMultiplier * (x - centerFieldX);
+        speed = speedMultiplierX * (x - centerFieldX);
 
         // turn off right motor and set left motor velocity to the calculated speed to turn right
         leftMotor.setVelocity(speed, velocityUnits::pct);
         rightMotor.setVelocity(0, velocityUnits::pct);
       }
-
       // if the object's x-coordinate is to the right of the center of vision
       else if (x < centerFieldX - 10)  // 10 is subtracted to the center x value to give a 10 pixel band to the target
       {
@@ -95,14 +94,13 @@ void focus(signature sig) // sig parameter is the object to detect
         Controller1.Screen.clearLine();
         Controller1.Screen.print("turning left");
         
-        // calculate speed by multiplying the speedMultiplier to the distance of object from the center on the x-axis
-        speed = speedMultiplier * (centerFieldX - x);
+        // calculate speed by multiplying the x-speedMultiplier to the distance of object from the center on the x-axis
+        speed = speedMultiplierX * (centerFieldX - x);
 
         // turn off left motor and set right motor velocity to the calculated speed to turn left
         leftMotor.setVelocity(0, velocityUnits::pct);
         rightMotor.setVelocity(speed, velocityUnits::pct);
       }
-
       // if object is in vision and centered on the x-axis
       else
       {
@@ -127,7 +125,7 @@ void focus(signature sig) // sig parameter is the object to detect
 // approach(object): function that approaches object in frame until the object is at the bottom of vision
 void approach(signature sig) // sig parameter is the object to detect
 {
-  // Initializing variables
+  // Initialize variables
   int objects = 0;
   int y = 0;
   double speed = 0;
@@ -141,43 +139,62 @@ void approach(signature sig) // sig parameter is the object to detect
     // store the largest object's y-coordinate
     y = Vision5.largestObject.centerY;
 
-    if (objects != 0)
+    // if no object in vision
+    if (objects == 0)
     {
-      if (Vision5.largestObject.centerY < bottomFieldY)
+      // print "no object" to controller
+      Controller1.Screen.clearLine();
+      Controller1.Screen.print("no object");
+
+      // set motor velocities to 0 (stop motors)
+      rightMotor.setVelocity(0, velocityUnits::pct);
+      leftMotor.setVelocity(0, velocityUnits::pct);
+
+      // end function
+      return;
+    }
+    // if objects in vision
+    else
+    {
+      // if the object's y-coordinate is above the bottom of vision
+      if (y < bottomFieldY)
       {
-        // turn right
+        // print "approaching" status to controller
         Controller1.Screen.clearLine();
         Controller1.Screen.print("approaching");
-        double speed = 0.75*(bottomFieldY-Vision5.largestObject.centerY);
+
+        // calculate speed by multiplying the y-speedMultiplier to the distance of object from the bottom of vision on the y-axis
+        speed = speedMultiplierY * (bottomFieldY - y);
+
+        // set both motors to calculated speed to move towards object
         leftMotor.setVelocity(speed, velocityUnits::pct);
         rightMotor.setVelocity(speed, velocityUnits::pct);
       }
+      // if the object is at bottom of vision
       else
       {
-        Controller1.Screen.clearLine();
-        Controller1.Screen.print("no object");
+        // set motor velocities to 0 (stop motors)
         leftMotor.setVelocity(0, velocityUnits::pct);
         rightMotor.setVelocity(0, velocityUnits::pct);
-        LinedUp = true;
-        return;
+
+        // end while loop
+        linedUp = true;
       }
-      // brief delay to keep the loop from looping too fast
-      rightMotor.spin(forward);
-      leftMotor.spin(forward);
     }
-    else
-    {
-      Controller1.Screen.clearLine();
-      Controller1.Screen.print("no object");
-      rightMotor.setVelocity(0, velocityUnits::pct);
-      leftMotor.setVelocity(0, velocityUnits::pct);
-    }
+
+    // spin both motors at set velocities
+    rightMotor.spin(forward);
+    leftMotor.spin(forward);
+
+    // while loop delay (50 milliseconds)
     wait(50, msec);
   }
 }
 
-// |---------- Main ----------|
-int main() {
+// |------------------- Main --------------------|
+
+int main()
+{
   // Initializing Robot Configuration
   vexcodeInit();
   
