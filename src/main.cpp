@@ -203,6 +203,9 @@ int main()
 
   // while loop spinning right motor until object appears in frame
   while (!find(Vision5__PINKDICE)) rightMotor.spin(forward);
+  
+  // stop motor when object found
+  rightMotor.stop();
 
   // once object in frame, the focus function is used to rotate the robot until the object's x-coordinate is centered in its vision
   focus(Vision5__PINKDICE);
